@@ -148,13 +148,13 @@ public:
 	virtual const_reverse_iterator rend() const { return data_internal_.rend(); }
 
 	iterator erase(const_iterator it) {
-		validateIterator(it);
+		validate_iterator(it);
 
 		if (it == end() || empty()) {
 			error("inlined_vector::erase it == end or container is empty");
 		}
 
-		unsigned int i = iteratorIndex(it);
+		unsigned int i = iterator_index(it);
 		if (i == size_) {
 			error("inlined_vector::insert invalid iterator");
 			return end();
@@ -167,7 +167,7 @@ public:
 	}
 
 	iterator insert(iterator it, const T& value) {
-		validateIterator(it);
+		validate_iterator(it);
 
 		if (full()) {
 			error("inlined_vector::insert exceeded InitialCapacity");
@@ -180,7 +180,7 @@ public:
 		}
 		else {
 			// Insert at i and push everything back
-			unsigned int i = iteratorIndex(it);
+			unsigned int i = iterator_index(it);
 			if (i == size_) {
 				error("inlined_vector::insert invalid iterator");
 				return end();
@@ -229,7 +229,7 @@ protected:
 		return *std::next(begin(), index);
 	}
 
-	unsigned int iteratorIndex(const_iterator it) const {
+	unsigned int iterator_index(const_iterator it) const {
 		auto nit = begin();
 		for (unsigned int i = 0; i < size_; i++) {
 			if (nit == it) return i;
@@ -238,10 +238,10 @@ protected:
 		return size_;
 	}
 
-	inline void validateIterator(const_iterator it) {
+	inline void validate_iterator(const_iterator it) {
 		#ifndef NDEBUG
 		if (it < begin() || it > end()) {
-			error("inlined_vector::validateIterator invalid iterator");
+			error("inlined_vector::validate_iterator invalid iterator");
 		}
 		#endif
 	}
@@ -344,7 +344,7 @@ public:
 
 	inline void push_back(const T& value) {
 		if (inlined_ && size_ >= max_size()){
-			growToDynamicStorage();
+			grow_to_external_storage();
 		}
 
 		if (inlined_){
@@ -358,7 +358,7 @@ public:
 	 
 	inline void push_back(T&& rvalue) {
 		if (inlined_ && size_ >= max_size()){
-			growToDynamicStorage();
+			grow_to_external_storage();
 		}
 
 		if (inlined_){
@@ -373,7 +373,7 @@ public:
 	template<class... Args>
     inline void emplace_back(Args&&... args) {
 		if (inlined_ && size_ >= max_size()){
-			growToDynamicStorage();
+			grow_to_external_storage();
 		}
 
 		if (inlined_){
@@ -393,14 +393,14 @@ public:
 	const_reverse_iterator rend() const override final { return inlined_ ? data_internal_.rend()  : unwrap(data_external_.rend());  }
 
 	iterator erase(const_iterator it) {
-		base_t::validateIterator(it);
+		base_t::validate_iterator(it);
 
 		if (it == end() || empty()) {
 			error("inlined_vector::erase it == end or container is empty");			
 		}
 
 		if (inlined_){
-			unsigned int i = base_t::iteratorIndex(it);
+			unsigned int i = base_t::iterator_index(it);
 			if (i == size_) {
 				error("inlined_vector::erase invalid iterator");
 				return end();
@@ -419,14 +419,14 @@ public:
 	}
 
 	iterator insert(iterator it, const T& value) {
-		base_t::validateIterator(it);
+		base_t::validate_iterator(it);
 
 		if (inlined_ && size_ < max_size()){
 			return base_t::insert(it, value);
 		}
 		else if (inlined_ && size_ >= max_size()){
-			unsigned int index_ = base_t::iteratorIndex(it);
-			growToDynamicStorage();
+			unsigned int index_ = base_t::iterator_index(it);
+			grow_to_external_storage();
 			it = std::next(begin(), index_);
 		}
 
@@ -468,7 +468,7 @@ protected:
 	inline reverse_iterator unwrap(typename std::vector<T>::reverse_iterator it) const { return reverse_iterator(&*it); }
 	inline const_reverse_iterator unwrap(typename std::vector<T>::const_reverse_iterator it) const { return const_reverse_iterator(&*it); }
 
-	void growToDynamicStorage(){
+	void grow_to_external_storage(){
 		assert(inlined_);
 		data_external_.resize(size_);
 		std::move(data_internal_.begin(), data_internal_.begin() + size_, data_external_.begin());
