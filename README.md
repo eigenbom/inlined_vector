@@ -1,8 +1,8 @@
 # Inlined Vector
 
-A simple c++11 vector-like data structure that stores elements internally. It can grow beyond its capacity, in which case it becomes a wrapper around std::vector. 
+A c++11 vector-like data structure that stores elements internally. It can grow beyond its capacity, in which case it becomes a wrapper around std::vector. 
 
-It is designed for simple use-cases with simple types. For a production quality inlined vector see e.g., [abseil](https://github.com/abseil/abseil-cpp/blob/master/absl/container/inlined_vector.h) or similar.
+It is designed for use with simple lightweight types. For a production quality inlined vector see e.g., [abseil](https://github.com/abseil/abseil-cpp/blob/master/absl/container/inlined_vector.h) or similar.
 
 ## Usage
 
