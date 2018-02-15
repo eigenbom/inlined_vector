@@ -57,7 +57,7 @@ TEST_CASE("basic operation", "[inlined_vector]") {
 		REQUIRE(v.size() == 6);
 		REQUIRE(v.back() == 13);
 		int popResult = v.back();
-		v.pop();
+		v.pop_back();
 		CHECK(popResult == 13);
 		CHECK(v.size() == 5);
 	}
@@ -81,6 +81,22 @@ TEST_CASE("basic operation", "[inlined_vector]") {
         CHECK(v[3] == 42);
         CHECK(v.size() == 6);
         v.erase(it);
+    }
+
+	SECTION("iteration") {
+        for (auto& p: v){
+            p += 1;            
+        }
+        CHECK(v[4] == 6);
+        for (auto& p: v){
+            p -= 1;
+        }
+
+        int i = 5;
+        for (auto it = v.rbegin(); it != v.rend(); ++it){
+            CHECK(*it == i);
+            i--;
+        }
     }
 }
 
@@ -104,7 +120,7 @@ TEST_CASE("basic operation (expandable)", "[inlined_vector]") {
 		REQUIRE(v.size() == 6);
 		REQUIRE(v.back() == 13);
 		int popResult = v.back();
-		v.pop();
+		v.pop_back();
 		CHECK(popResult == 13);
 		CHECK(v.size() == 5);
 	}
@@ -114,7 +130,7 @@ TEST_CASE("basic operation (expandable)", "[inlined_vector]") {
         for (int i=0; i<100; i++) v.push_back(i);
         CHECK(v.size() == 105);
         CHECK(v.expanded());
-        for (int i=0; i<100; i++) v.pop();
+        for (int i=0; i<100; i++) v.pop_back();
         CHECK(v.size() == 5);
 	}
 
@@ -138,7 +154,30 @@ TEST_CASE("basic operation (expandable)", "[inlined_vector]") {
         CHECK(v.size() == 6);
         v.erase(it);
     }
+
+    SECTION("iteration") {
+        for (auto& p: v){
+            p += 1;            
+        }
+        CHECK(v[4] == 6);
+        for (auto& p: v){
+            p -= 1;
+        }
+
+        int i = 5;
+        for (auto it = v.rbegin(); it != v.rend(); ++it){
+            CHECK(*it == i);
+            i--;
+        }
+    }
 }
+
+struct MoveOnly {
+    MoveOnly(){}
+    MoveOnly(const MoveOnly&) = delete;
+    MoveOnly(MoveOnly&&){}
+    MoveOnly& operator=(MoveOnly&&){return *this;}
+};
 
 TEST_CASE("construction", "[inlined_vector]"){
     SECTION("construct from initialiser_list"){     
@@ -189,6 +228,28 @@ TEST_CASE("construction", "[inlined_vector]"){
         inlined_vector<int, 8, true> v1 { res };
         inlined_vector<int, 8, true> v2 { std::move(v1) };
         CHECK_THAT(v2, Equals(v2, res));
+    }
+
+    SECTION("move construct"){
+        inlined_vector<MoveOnly, 8, false> v1;
+        v1.emplace_back();
+        v1.emplace_back();
+        v1.emplace_back();
+        v1.emplace_back();
+
+        inlined_vector<MoveOnly, 8, false> v2 { std::move(v1) };
+        CHECK(v2.size() == 4);
+    }
+
+    SECTION("move construct"){
+        inlined_vector<MoveOnly, 8, true> v1;
+        v1.emplace_back();
+        v1.emplace_back();
+        v1.emplace_back();
+        v1.emplace_back();
+
+        inlined_vector<MoveOnly, 8, true> v2 { std::move(v1) };
+        CHECK(v2.size() == 4);
     }
 
     SECTION("copy assignment"){

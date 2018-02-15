@@ -35,6 +35,10 @@ public:
 	inlined_vector(const inlined_vector<T, InitialCapacity_, CanExpand_>& other)
 		: inlined_vector(other.begin(), other.size()) {}
 
+    template<int InitialCapacity_, bool CanExpand_>
+    inlined_vector(inlined_vector<T, InitialCapacity_, CanExpand_>&& other)
+        : inlined_vector(other.begin(), other.size()) {}
+
 	template<class Container>
 	inlined_vector(const Container& els) : inlined_vector(els.begin(), els.size()) {}
 
@@ -94,7 +98,7 @@ public:
 		}
 	}
 
-	inline void pop() {
+	inline void pop_back() {
 		if (!empty())
 			size_--;
 	}
@@ -287,6 +291,14 @@ public:
 	inlined_vector(const inlined_vector<T, InitialCapacity_, CanExpand_>& other)
 		: inlined_vector(other.begin(), other.end(), other.size()) {}
 
+    inlined_vector(inlined_vector&& other)
+        : base_t(std::move(other.data_internal_), other.size_),
+		  data_external_(std::move(other.data_external_)), 
+          inlined_(other.inlined_) {
+        other.inlined_ = true;
+        other.size_ = 0;
+    }
+
 	template<class Container>
 	inlined_vector(const Container& els) : inlined_vector(els.begin(), els.end(), els.size()) {}
 
@@ -295,14 +307,6 @@ public:
 
 	inlined_vector(const inlined_vector& other)
 		: inlined_vector(other.begin(), other.end(), other.size()) {}
-
-	inlined_vector(inlined_vector&& other)
-		: base_t(std::move(other.data_internal_), other.size_),
-		  data_external_(std::move(other.data_external_)), inlined_(other.inlined_) {
-		// TODO: Allow move between different fixed_vectors
-		other.inlined_ = true;
-		other.size_ = 0;
-	}
 
 	inlined_vector& operator=(inlined_vector&& other) {
 		inlined_ = other.inlined_;
