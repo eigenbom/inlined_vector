@@ -9,6 +9,8 @@
 #include <utility>
 #include <vector>
 
+#include "static_vector.h"
+
 #define INLINED_VECTOR_THROWS
 // #define INLINED_VECTOR_LOG_ERROR(message) std::cerr << message << "\n"
 #include "inlined_vector.h"
@@ -16,6 +18,18 @@
 #define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 #include "container_matcher.h"
+
+TEST_CASE("basics", "[static_vector]") {
+    static_vector<int, 8> v;
+    CHECK(v.size() == 0);
+    CHECK(v.max_size() == 8);
+
+    v.push_back(42);
+    v.push_back(3);
+
+    CHECK(*v.begin() == 42);
+    CHECK(*std::next(v.begin(), 1) == 3);
+}
 
 // inlined_vector<int, -1, false> gNegativeSizedVectorWillStaticAssert;
 
@@ -37,7 +51,15 @@ TEST_CASE("basic construction", "[inlined_vector]") {
     CHECK(!v2.expanded());
 }
 
-TEST_CASE("basic operation", "[inlined_vector]") {
+TEST_CASE("basic operations 1", "[inlined_vector]") {
+    inlined_vector<int, 16, false> v1 { 3 };
+    v1.push_back(42);
+    CHECK(v1.size() == 2);
+    CHECK(v1.front() == 3);
+    CHECK(v1.back() == 42);
+}
+
+TEST_CASE("basic operations 2", "[inlined_vector]") {
 	inlined_vector<int, 16, false> v { 1, 2, 3, 4, 5 };
 	REQUIRE(v.max_size() == 16);
 	REQUIRE(v.size() == 5);
@@ -100,7 +122,17 @@ TEST_CASE("basic operation", "[inlined_vector]") {
     }
 }
 
-TEST_CASE("basic operation (expandable)", "[inlined_vector]") {
+TEST_CASE("basic operations 1 (expandable)", "[inlined_vector]") {
+    inlined_vector<int, 16, true> v1 { 3 };
+    CHECK(v1.front() == 3);
+    CHECK(v1.size() == 1);
+    v1.push_back(42);
+    CHECK(v1.size() == 2);
+    CHECK(v1.front() == 3);
+    CHECK(v1.back() == 42);
+}
+
+TEST_CASE("basic operations 2 (expandable)", "[inlined_vector]") {
 	inlined_vector<int, 16, true> v { 1, 2, 3, 4, 5 };
 	REQUIRE(v.max_size() == 16);
 	REQUIRE(v.size() == 5);
@@ -116,7 +148,7 @@ TEST_CASE("basic operation (expandable)", "[inlined_vector]") {
 	}
 
 	SECTION("can push back and pop") {
-		v.push_back(13);
+        v.push_back(13);
 		REQUIRE(v.size() == 6);
 		REQUIRE(v.back() == 13);
 		int popResult = v.back();

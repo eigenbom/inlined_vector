@@ -9,11 +9,14 @@
 #include <array>
 #include <cassert>
 #include <iterator>
+#include <iostream>
 #include <ostream>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#include "static_vector.h"
 
 // A vector-like container with inlined storage
 // Optional: can grow beyond initial InitialCapacity (using a std::vector)
@@ -21,7 +24,7 @@ template<typename T, int InitialCapacity, bool CanExpand = false> class inlined_
 	static_assert(InitialCapacity > 0, "InitialCapacity should be > 0");
 
 public:
-	using array_type = std::array<T, InitialCapacity>;
+	using array_type = static_vector<T, InitialCapacity>; // std::array<T, InitialCapacity>;
 	using value_type = T;
 	using iterator = value_type*;
 	using const_iterator = const value_type*;
@@ -63,7 +66,8 @@ public:
 			error("inlined_vector::push_back exceeded InitialCapacity");
 		}
 		else {
-			data_internal_[size_++] = value;
+			data_internal_.push_back(value);
+			size_++;
 		}
 	}
 
@@ -72,7 +76,8 @@ public:
 			error("inlined_vector::push_back exceeded InitialCapacity");
 		}
 		else {
-			data_internal_[size_++] = std::move(rvalue);
+			data_internal_.emplace_back(std::move(rvalue));
+			size_++;
 		}
 	}
 
@@ -81,7 +86,7 @@ public:
 			error("inlined_vector::emplace_back exceeded InitialCapacity");
 		}
 		else {
-			data_internal_[size_] = std::move(T(std::forward<Args>(args)...));
+			data_internal_.emplace_back(std::forward<Args>(args)...);
 			size_++;
 		}
 	}
@@ -98,9 +103,8 @@ public:
 		}
 	}
 
-	inline void pop_back() {
-		if (!empty())
-			size_--;
+	inline virtual void pop_back() {
+		if (!empty()) size_--;
 	}
 
 	inline const T& back() const {
@@ -220,7 +224,12 @@ protected:
 		else {
 			size_ = size;
 		}
-		std::move(begin_, std::next(begin_, size_), data_internal_.begin());
+
+		auto end_ = std::next(begin_, size_);
+		for (auto it = begin_; it != end_; ++it){
+			data_internal_.emplace_back(std::move(*it));
+		}
+		// std::move(begin_, std::next(begin_, size_), data_internal_.begin());
 	}
 
 	// Helper constructor for sub-class
@@ -356,7 +365,7 @@ public:
 		}
 
 		if (inlined_) {
-			data_internal_[size_++] = value;
+			base_t::push_back(value);
 		}
 		else {
 			data_external_.push_back(value);
@@ -370,7 +379,7 @@ public:
 		}
 
 		if (inlined_) {
-			data_internal_[size_++] = std::move(rvalue);
+			base_t::push_back(std::move(rvalue));
 		}
 		else {
 			data_external_.emplace_back(std::move(rvalue));
@@ -384,13 +393,18 @@ public:
 		}
 
 		if (inlined_) {
-			// No emplace for array
-			data_internal_[size_] = std::move(T(std::forward<Args>(args)...));
-			size_++;
+			base_t::emplace_back(std::forward<Args>(args)...);
 		}
 		else {
 			data_external_.emplace_back(std::forward<Args>(args)...);
 			size_++;
+		}
+	}
+
+	inline void pop_back() override final {
+		if (!empty()){
+			if (inlined_) data_external_.pop_back();
+			size_--;
 		}
 	}
 
@@ -466,7 +480,9 @@ protected:
 	template<typename Iter> inlined_vector(Iter begin_, Iter end_, unsigned int size) {
 		size_ = size;
 		if (size_ <= max_size()) {
-			std::move(begin_, end_, data_internal_.begin());
+			for (auto it = begin_; it != end_; ++it){
+				data_internal_.emplace_back(std::move(*it));
+			}
 		}
 		else {
 			data_external_.resize(size_);
@@ -488,8 +504,7 @@ protected:
 
 	void grow_to_external_storage() {
 		assert(inlined_);
-		data_external_.resize(size_);
-		std::move(data_internal_.begin(), data_internal_.begin() + size_, data_external_.begin());
+		data_internal_.emplace_into(data_external_);
 		inlined_ = false;
 	}
 
