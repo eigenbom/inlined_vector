@@ -2,8 +2,9 @@
 #define STATIC_VECTOR_H
 
 #include <iterator>
-#include <type_traits>
 #include <string>
+#include <type_traits>
+#include <utility>
 
 template<class T, int Capacity>
 class static_vector
@@ -31,15 +32,11 @@ public:
     }
 
     ~static_vector(){
-        for(unsigned int i = 0; i < size_; ++i) {
-            destroy(data_+i);
-        }
+        destroy_all();
     }
 
     static_vector& operator=(const static_vector& other){
-        for(unsigned int i = 0; i < size_; ++i) {
-            destroy(data_+i);
-        }
+        destroy_all();
         size_ = other.size_;
         for(unsigned int i = 0; i < size_; ++i) {
             new (data_+i) T(other[i]);
@@ -48,9 +45,7 @@ public:
     }
 
     static_vector& operator=(static_vector&& other){
-        for(unsigned int i = 0; i < size_; ++i) {
-            destroy(data_+i);
-        }
+        destroy_all();
         size_ = other.size_;
         for(unsigned int i = 0; i < size_; ++i) {
             new (data_+i) T(std::move(other[i]));
@@ -58,15 +53,13 @@ public:
         return *this;
     }
 
-    void push_back(const T& value) {
-        if( size_ >= max_size() ) throw std::bad_alloc{};
-        new (data_+size_) T(value);
-        ++size_;
-    }
+    inline int size() const { return size_; }
+    constexpr static inline int max_size() { return Capacity; }
 
-    void push_back(T&& value) {
+    template <class U>
+    void push_back(U&& value) {
         if( size_ >= max_size() ) throw std::bad_alloc{};
-        new (data_+size_) T(std::move(value));
+        new (data_+size_) T(std::forward<U>(value));
         ++size_;
     }
 
@@ -75,9 +68,6 @@ public:
         new (data_+size_) T(std::forward<Args>(args)...);
         ++size_;
     }
-
-    inline int size() const { return size_; }
-    constexpr static inline int max_size() { return Capacity; }
  
     T& operator[](unsigned int i){
         return *launder(data_ + i);
@@ -127,6 +117,13 @@ protected:
 
     void destroy(raw_type* rt){
         launder(rt)->~T();
+    }
+
+    void destroy_all(){
+        for(unsigned int i = 0; i < size_; ++i) {
+            destroy(data_+i);
+        }
+        size_ = 0;
     }
 };
 

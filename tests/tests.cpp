@@ -120,6 +120,12 @@ TEST_CASE("basic operations 2", "[inlined_vector]") {
             i--;
         }
     }
+
+    SECTION("can clear") {
+        v.clear();
+        CHECK(v.empty());
+        CHECK(v.size() == 0);
+    }
 }
 
 TEST_CASE("basic operations 1 (expandable)", "[inlined_vector]") {
@@ -201,6 +207,12 @@ TEST_CASE("basic operations 2 (expandable)", "[inlined_vector]") {
             CHECK(*it == i);
             i--;
         }
+    }
+    
+    SECTION("can clear") {
+        v.clear();
+        CHECK(v.empty());
+        CHECK(v.size() == 0);
     }
 }
 
