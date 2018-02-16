@@ -1,30 +1,28 @@
 // Customise the behaviour of inlined_vector by defining these before including it:
-// - #define INLINED_VECTOR_THROWS to get runtime_error
-// - #define INLINED_VECTOR_LOG_ERROR(message) to log errors
+// - #define BSP_INLINED_VECTOR_THROWS to get runtime_error
+// - #define BSP_INLINED_VECTOR_LOG_ERROR(message) to log errors
 
-#ifndef INLINED_VECTOR_H
-#define INLINED_VECTOR_H
+#ifndef BSP_INLINED_VECTOR_H
+#define BSP_INLINED_VECTOR_H
 
 #include <algorithm>
 #include <array>
 #include <cassert>
 #include <iterator>
-#include <iostream>
 #include <ostream>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
-#ifdef INLINED_VECTOR_THROWS
+#ifdef BSP_INLINED_VECTOR_THROWS
 #include <stdexcept>
 #endif
 
-namespace e {
+namespace bsp {
 namespace detail {
 	template< bool B, class T = void > using enable_if_t = typename std::enable_if<B,T>::type;
-	template< class T > using decay_t = typename std::decay<T>::type;
 
-	template<class T, std::size_t Capacity> class static_vector {
+	template<class T, std::size_t Capacity> class static_vector_base {
 	public:
 		using value_type = T;
 		using iterator = value_type*;
@@ -34,46 +32,10 @@ namespace detail {
 		using size_type = std::size_t;
 
 	public:
-		static_vector() = default;
+		static_vector_base() = default;
 
-		static_vector(size_type count, const T& value = T()):size_(count){
-			for(size_type i = 0; i < size_; ++i) {
-				new (data_+i) T(value);
-			}
-		}
-
-		static_vector(const static_vector& st):size_(st.size_){
-			for(size_type i = 0; i < size_; ++i) {
-				new (data_+i) T(st[i]);
-			}
-		}
-
-		static_vector(static_vector&& st):size_(st.size_){
-			for(size_type i = 0; i < size_; ++i) {
-				new (data_+i) T(std::move(st[i]));
-			}
-		}
-
-		~static_vector(){
+		~static_vector_base(){
 			destroy_all();
-		}
-
-		static_vector& operator=(const static_vector& other){
-			destroy_all();
-			size_ = other.size_;
-			for(size_type i = 0; i < size_; ++i) {
-				new (data_+i) T(other[i]);
-			}
-			return *this;
-		}
-
-		static_vector& operator=(static_vector&& other){
-			destroy_all();
-			size_ = other.size_;
-			for(size_type i = 0; i < size_; ++i) {
-				new (data_+i) T(std::move(other[i]));
-			}
-			return *this;
 		}
 
 		inline size_type size() const { return size_; }
@@ -117,26 +79,9 @@ namespace detail {
 
 		template <typename Container> void emplace_into(Container& container){
 			assert(container.size() == 0);
-
 			container.resize(size_);
 			std::move(begin(), end(), container.begin());
 			destroy_all();
-
-			// TODO: Might need to launder?
-			// for(size_type i = 0; i < size_; ++i) {
-			//	container.emplace_back(std::move(*launder(data_+i)));
-			//	destroy(data_+i);
-			// }
-			// size_ = 0;
-		}
-
-		void fill_n(size_type count, const T& value) {
-			destroy_all();
-			if( count >= max_size() ) throw std::bad_alloc{};
-			for(size_type i = 0; i < count; ++i) {
-				new (data_+i) T(value);
-			}
-			size_ = count;
 		}
 
 	protected:
@@ -175,17 +120,112 @@ namespace detail {
 			size_ = 0;
 		}
 	};
-/*
-	template<class T, std::size_t Capacity> class static_vector<T, Capacity, true>: public static_vector<T, Capacity, false> {
-	protected:
-		using base_t = static_vector<T, Capacity, false>; 
+
+	template<class T, std::size_t Capacity, bool IsTrivialType = std::is_trivial<T>::value> 
+	class static_vector: public static_vector_base<T, Capacity> 
+	// T is a trivial type
+	{		
+	protected:		
+		using base_t = static_vector_base<T, Capacity>; 
 	public:	
 		using base_t::base_t;
+		using typename base_t::size_type;
+		using base_t::size_;
+		using base_t::data_;
 
-		static_vector(const static_vector& st):base_t::size_(st.size_){
-			// TODO: Just do a mem copy
+		static_vector(size_type count, const T& value = T()){
+			std::fill_n(base_t::begin(), count, value);
+			size_ = count;
 		}
-	};*/
+
+		static_vector(const static_vector& other){
+			std::copy(other.begin(), other.end(), base_t::begin());
+			size_ = other.size_;
+		}
+
+		static_vector(static_vector&& other){
+			std::move(other.begin(), other.end(), base_t::begin());
+			size_ = other.size_;
+		}
+
+		static_vector& operator=(const static_vector& other){
+			std::copy(other.begin(), other.end(), base_t::begin());
+			size_ = other.size_;
+			return *this;
+		}
+
+		static_vector& operator=(static_vector&& other){
+			std::move(other.begin(), other.end(), base_t::begin());
+			std::swap(size_, other.size_);
+			return *this;
+		}
+
+		void fill_n(size_type count, const T& value) {
+			if (count >= base_t::max_size()) throw std::bad_alloc{};
+			std::fill_n(base_t::begin(), count, value);			
+			size_ = count;
+		}
+	};
+
+	template<class T, std::size_t Capacity> class static_vector<T, Capacity, false>: public static_vector_base<T, Capacity> 
+	// T is a non-trivial type
+	{
+	protected:
+		using base_t = static_vector_base<T, Capacity>; 
+	public:	
+		using base_t::base_t;
+		using typename base_t::size_type;
+		using base_t::size_;
+		using base_t::data_;
+
+		static_vector(size_type count, const T& value = T()){
+			size_ = count;
+			for(size_type i = 0; i < size_; ++i) {
+				new (data_+i) T(value);
+			}
+		}
+
+		static_vector(const static_vector& st){
+			size_ = st.size_;
+			for(size_type i = 0; i < size_; ++i) {
+				new (data_+i) T(st[i]);
+			}
+		}
+
+		static_vector(static_vector&& st){
+			size_ = st.size_;
+			for(size_type i = 0; i < size_; ++i) {
+				new (data_+i) T(std::move(st[i]));
+			}
+		}
+
+		static_vector& operator=(const static_vector& other){
+			base_t::destroy_all();
+			size_ = other.size_;
+			for(size_type i = 0; i < size_; ++i) {
+				new (data_+i) T(other[i]);
+			}
+			return *this;
+		}
+
+		static_vector& operator=(static_vector&& other){
+			base_t::destroy_all();
+			size_ = other.size_;
+			for(size_type i = 0; i < size_; ++i) {
+				new (data_+i) T(std::move(other[i]));
+			}
+			return *this;
+		}
+
+		void fill_n(size_type count, const T& value) {
+			base_t::destroy_all();
+			if( count >= base_t::max_size() ) throw std::bad_alloc{};
+			for(size_type i = 0; i < count; ++i) {
+				new (data_+i) T(value);
+			}
+			size_ = count;
+		}
+	};
 
 	template <class, class Enable = void> struct is_iterator : std::false_type {};
 	template <typename T_> struct is_iterator<T_, typename std::enable_if<
@@ -727,6 +767,6 @@ inline std::ostream& operator<<(std::ostream& out, const inlined_vector<T, N, tr
 	}
 	return out;
 }
-} // namespace e
+} // namespace bsp
 
 #endif

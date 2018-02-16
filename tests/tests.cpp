@@ -10,51 +10,16 @@
 #include <utility>
 #include <vector>
 
-#define INLINED_VECTOR_THROWS
-// #define INLINED_VECTOR_LOG_ERROR(message) std::cerr << message << "\n"
+#define BSP_INLINED_VECTOR_THROWS
+// #define BSP_INLINED_VECTOR_LOG_ERROR(message) std::cerr << message << "\n"
 #include "inlined_vector.h"
 
 #define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 #include "container_matcher.h"
 
-using e::detail::static_vector;
-using e::inlined_vector;
-
-template <typename T>
-class Base {
-public:
-    Base(const T& t):t(t){}
-    T t;
-};
-
-template <typename T, bool IsTrivialType = std::is_trivial<T>::value>
-class Special: public Base<T>{
-public:
-    using base_t = Base<T>;
-    using base_t::base_t;
-
-    void print(){ std::cout << "trivial T\n"; }
-};
-
-template <typename T>
-class Special<T, false>: public Base<T> {
-public:
-    using base_t = Base<T>;
-    using base_t::base_t;
-
-    void print(){ std::cout << "non-trivial T\n"; }
-};
-
-TEST_CASE("junk", "[junk]") {
-    Special<int> a {3};
-    Special<std::string> b {std::string("Hello")};
-
-    a.print();
-    b.print();
-
-    CHECK(true);
-}
+using bsp::detail::static_vector;
+using bsp::inlined_vector;
 
 TEST_CASE("basics", "[static_vector]") {
     static_vector<int, 8> v;
@@ -69,10 +34,23 @@ TEST_CASE("basics", "[static_vector]") {
 }
 
 TEST_CASE("pod", "[static_vector]") {
-    std::cout << "Expect: 1 non-trivial destruct and 1 trivial destruct" << "\n";
-    static_vector<int, 1> v1;
-    static_vector<std::string, 1> v2;
-    CHECK(true);
+
+    SECTION("destruction"){
+        std::cout << "Expect: 1 non-trivial destruct and 1 trivial destruct" << "\n";
+        static_vector<int, 1> v1;
+        static_vector<std::string, 1> v2;
+        CHECK(true);
+    }
+
+    SECTION("copy"){
+        std::cout << "Expect: 1 trivial copy and 1 non-trivial copy" << "\n";
+        static_vector<int, 8> v1 (4, 42);
+        static_vector<int, 8> v2 = v1;
+        static_vector<std::string, 8> v3;
+        v3.push_back(std::string("Hello"));
+        static_vector<std::string, 8> v4 = v3;
+        CHECK(true);
+    }
 }
 
 // inlined_vector<int, -1, false> gNegativeSizedVectorWillStaticAssert;
