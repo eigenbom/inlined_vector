@@ -33,6 +33,15 @@ TEST_CASE("basics", "[static_vector]") {
     CHECK(*std::next(v.begin(), 1) == 3);
 }
 
+struct Counter {
+    int* counter = nullptr;
+    Counter() = default;
+    Counter(int* i):counter(i){ if (counter) (*counter)++; }
+    Counter(const Counter& c){ counter = c.counter; if (counter) (*counter)++; };
+    Counter(Counter&& c){ counter = c.counter; c.counter = nullptr; };
+    ~Counter(){ if (counter) (*counter)--; }
+};
+
 TEST_CASE("pod", "[static_vector]") {
 
     SECTION("destruction"){
@@ -40,6 +49,38 @@ TEST_CASE("pod", "[static_vector]") {
         static_vector<int, 1> v1;
         static_vector<std::string, 1> v2;
         CHECK(true);
+    }
+
+    SECTION("more destruction"){
+        int counter = 0;
+        {
+            static_vector<Counter, 3> v;
+            v.emplace_back(&counter);
+            v.emplace_back(&counter);
+            v.emplace_back(&counter);
+            CHECK(counter == 3);
+        }
+        CHECK(counter == 0);
+
+        {
+            static_vector<Counter, 3> v;
+            v.emplace_back(&counter);
+            v.emplace_back(&counter);
+            v.emplace_back(&counter);
+            static_vector<Counter, 3> v2 = v;
+            CHECK(counter == 6);
+        }
+        CHECK(counter == 0);
+
+        {
+            static_vector<Counter, 3> v;
+            v.emplace_back(&counter);
+            v.emplace_back(&counter);
+            v.emplace_back(&counter);
+            static_vector<Counter, 3> v2 = std::move(v);
+            CHECK(counter == 3);
+        }
+        CHECK(counter == 0);
     }
 
     SECTION("copy"){
