@@ -17,14 +17,14 @@ Drop the header into your project. Provide the following defines before includin
 The vector is templated on type, initial capacity, and whether it is allowed to expand or not. For example, `v1` is a non-expanding vector of 16 integers and `v2` is an expanding vector of 8 integers.
 
 ```
-inlined_vector<int, 16, false> v1;
-inlined_vector<int, 8, true> v2;
+e::inlined_vector<int, 16, false> v1;
+e::inlined_vector<int, 8, true> v2;
 ```
 
 API is similar to `std::vector`:
 
 ```
-inlined_vector<int, 16, true> v { 1, 2, 3, 4, 5 };
+e::inlined_vector<int, 16, true> v { 1, 2, 3, 4, 5 };
 assert(v.size() == 5);
 v.push_back(13);
 assert(v.back() == 13);
@@ -44,7 +44,7 @@ v.erase(it);
 Use `expanded()` to check if the inlined_vector has grown into a dynamically-allocated vector.
 
 ```
-inlined_vector<int, 16, true> v { 1, 2, 3, 4, 5 };
+e::inlined_vector<int, 16, true> v { 1, 2, 3, 4, 5 };
 for (int i=0; i<32; ++i) v.push_back(i);
 assert(v.expanded());
 ```

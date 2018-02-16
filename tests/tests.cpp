@@ -9,8 +9,6 @@
 #include <utility>
 #include <vector>
 
-#include "static_vector.h"
-
 #define INLINED_VECTOR_THROWS
 // #define INLINED_VECTOR_LOG_ERROR(message) std::cerr << message << "\n"
 #include "inlined_vector.h"
@@ -18,6 +16,9 @@
 #define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 #include "container_matcher.h"
+
+using e::detail::static_vector;
+using e::inlined_vector;
 
 TEST_CASE("basics", "[static_vector]") {
     static_vector<int, 8> v;
@@ -37,6 +38,15 @@ TEST_CASE("sizeof", "[inlined_vector]") {
     inlined_vector<int, 16, false> v1;
     inlined_vector<int, 16, true> v2;
     CHECK(sizeof(v1) < sizeof(v2));
+}
+
+TEST_CASE("operator<<", "[inlined_vector]") {
+    std::cout << "Testing output...\n";
+    inlined_vector<int, 16, false> v1 { 1, 2, 3, 4, 5 };
+    inlined_vector<int, 16, false> v2 { 6, 7, 8, 9, 10 };
+    std::cout << v1 << "\n";
+    std::cout << v2 << "\n";
+    CHECK(true);
 }
 
 TEST_CASE("basic construction", "[inlined_vector]") {
@@ -217,13 +227,36 @@ TEST_CASE("basic operations 2 (expandable)", "[inlined_vector]") {
 }
 
 struct MoveOnly {
-    MoveOnly(){}
+    MoveOnly(int value = 0):value(value){}
     MoveOnly(const MoveOnly&) = delete;
-    MoveOnly(MoveOnly&&){}
-    MoveOnly& operator=(MoveOnly&&){return *this;}
+    MoveOnly(MoveOnly&& other):value(std::move(other.value)){ other.value = 0; }
+    MoveOnly& operator=(MoveOnly&& other){ value = std::move(other.value); other.value = 0; return *this;}
+    int value = 0;
 };
 
 TEST_CASE("construction", "[inlined_vector]"){
+    SECTION("construct with duplicates"){     
+        inlined_vector<int, 8, false> fv (6, 42);
+        std::vector<int> result {42, 42, 42, 42, 42, 42 };
+        CHECK(fv.size() == 6);
+        CHECK_THAT(fv, Equals(fv, result));
+    }
+
+    SECTION("construct with duplicates"){     
+        inlined_vector<int, 8, true> fv (6, 42);
+        std::vector<int> result {42, 42, 42, 42, 42, 42 };
+        CHECK(fv.size() == 6);
+        CHECK_THAT(fv, Equals(fv, result));
+    }
+
+    SECTION("construct with duplicates"){     
+        inlined_vector<int, 8, true> fv (100, 42);
+        CHECK(fv.size() == 100);
+        for (int i=0; i<100; i++){
+            CHECK(fv[i] == 42);
+        }
+    }
+
     SECTION("construct from initialiser_list"){     
         inlined_vector<int, 8, false> fv { 1, 2, 3, 4, 5 };
         std::vector<int> v {1, 2, 3, 4, 5};
@@ -417,32 +450,50 @@ TEST_CASE("ignore extra elements", "[inlined_vector]"){
 #endif
 
 TEST_CASE("moveability", "[inlined_vector]"){    
-    
     SECTION("can move element into vector"){
-        inlined_vector<std::unique_ptr<int>, 8, true> v;
-        std::unique_ptr<int> p {new int {3}};
+        inlined_vector<MoveOnly, 8, false> v;
+        MoveOnly p {3};
         v.push_back(std::move(p));
         auto& q = v.back();
-        *q = 6;
-        CHECK(*v.back() == 6);
+        q.value = 6;
+        CHECK(v.back().value == 6);
     }
 
     SECTION("can move vector"){
-        inlined_vector<std::unique_ptr<int>, 8, true> v1;
-        std::unique_ptr<int> p {new int {3}};
+        inlined_vector<MoveOnly, 8, false> v1;
+        MoveOnly p {3};
         v1.push_back(std::move(p));
-        inlined_vector<std::unique_ptr<int>, 8, true> v2 = std::move(v1);
-        CHECK(*v2.front() == 3);
+        inlined_vector<MoveOnly, 8, false> v2 = std::move(v1);
+        CHECK(v2.front().value == 3);
+    }
+}
+
+TEST_CASE("moveability (expanded)", "[inlined_vector]"){    
+    SECTION("can move element into vector"){
+        inlined_vector<MoveOnly, 8, true> v;
+        MoveOnly p {3};
+        v.push_back(std::move(p));
+        auto& q = v.back();
+        q.value = 6;
+        CHECK(v.back().value == 6);
+    }
+
+    SECTION("can move vector"){
+        inlined_vector<MoveOnly, 8, true> v1;
+        MoveOnly p {3};
+        v1.push_back(std::move(p));
+        inlined_vector<MoveOnly, 8, true> v2 = std::move(v1);
+        CHECK(v2.front().value == 3);
     }
 
     SECTION("can expand vector with moveable elements"){
-        inlined_vector<std::unique_ptr<int>, 8, true> v;
-        v.emplace_back(new int(0));
+        inlined_vector<MoveOnly, 8, true> v;
+        v.emplace_back(0);
         for (int i=0; i<10; i++){
-            v.push_back(std::unique_ptr<int>{new int{42}});
+            v.push_back(MoveOnly{42});
         }
-        v.emplace_back(new int(42));
-        CHECK(*v.back() == 42);
+        v.emplace_back(42);
+        CHECK(v.back().value == 42);
     }
 }
 
