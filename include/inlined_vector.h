@@ -9,6 +9,7 @@
 #include <array>
 #include <cassert>
 #include <iterator>
+#include <iostream>
 #include <ostream>
 #include <type_traits>
 #include <utility>
@@ -20,6 +21,9 @@
 
 namespace e {
 namespace detail {
+	template< bool B, class T = void > using enable_if_t = typename std::enable_if<B,T>::type;
+	template< class T > using decay_t = typename std::decay<T>::type;
+
 	template<class T, std::size_t Capacity> class static_vector {
 	public:
 		using value_type = T;
@@ -111,12 +115,19 @@ namespace detail {
 		const_reverse_iterator rbegin() const { return rend() - size_; }
 		const_reverse_iterator rend() const { return std::reverse_iterator<const_iterator>(begin()); }
 
-		template <typename Container> void emplace_into(Container& container){        
-			for(size_type i = 0; i < size_; ++i) {
-				container.emplace_back(std::move(*launder(data_+i)));
-				destroy(data_+i);
-			}
-			size_ = 0;
+		template <typename Container> void emplace_into(Container& container){
+			assert(container.size() == 0);
+
+			container.resize(size_);
+			std::move(begin(), end(), container.begin());
+			destroy_all();
+
+			// TODO: Might need to launder?
+			// for(size_type i = 0; i < size_; ++i) {
+			//	container.emplace_back(std::move(*launder(data_+i)));
+			//	destroy(data_+i);
+			// }
+			// size_ = 0;
 		}
 
 		void fill_n(size_type count, const T& value) {
@@ -143,17 +154,38 @@ namespace detail {
 			return reinterpret_cast<const T*>(rt);
 		}
 
-		void destroy(raw_type* rt){
+		template <typename U = T>
+		enable_if_t<std::is_trivially_destructible<U>::value> destroy(raw_type* rt){}
+
+		template <typename U = T>
+		enable_if_t<!std::is_trivially_destructible<U>::value> destroy(raw_type* rt){
 			launder(rt)->~T();
 		}
 
-		void destroy_all(){
+		template <typename U = T>
+		enable_if_t<std::is_trivially_destructible<U>::value> destroy_all(){
+			size_ = 0;
+		}
+
+		template <typename U = T>
+		enable_if_t<!std::is_trivially_destructible<U>::value> destroy_all(){
 			for(size_type i = 0; i < size_; ++i) {
 				destroy(data_+i);
 			}
 			size_ = 0;
 		}
 	};
+/*
+	template<class T, std::size_t Capacity> class static_vector<T, Capacity, true>: public static_vector<T, Capacity, false> {
+	protected:
+		using base_t = static_vector<T, Capacity, false>; 
+	public:	
+		using base_t::base_t;
+
+		static_vector(const static_vector& st):base_t::size_(st.size_){
+			// TODO: Just do a mem copy
+		}
+	};*/
 
 	template <class, class Enable = void> struct is_iterator : std::false_type {};
 	template <typename T_> struct is_iterator<T_, typename std::enable_if<

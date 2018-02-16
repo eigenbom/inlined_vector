@@ -6,6 +6,7 @@
 #include <iterator>
 #include <memory>
 #include <random>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -20,6 +21,41 @@
 using e::detail::static_vector;
 using e::inlined_vector;
 
+template <typename T>
+class Base {
+public:
+    Base(const T& t):t(t){}
+    T t;
+};
+
+template <typename T, bool IsTrivialType = std::is_trivial<T>::value>
+class Special: public Base<T>{
+public:
+    using base_t = Base<T>;
+    using base_t::base_t;
+
+    void print(){ std::cout << "trivial T\n"; }
+};
+
+template <typename T>
+class Special<T, false>: public Base<T> {
+public:
+    using base_t = Base<T>;
+    using base_t::base_t;
+
+    void print(){ std::cout << "non-trivial T\n"; }
+};
+
+TEST_CASE("junk", "[junk]") {
+    Special<int> a {3};
+    Special<std::string> b {std::string("Hello")};
+
+    a.print();
+    b.print();
+
+    CHECK(true);
+}
+
 TEST_CASE("basics", "[static_vector]") {
     static_vector<int, 8> v;
     CHECK(v.size() == 0);
@@ -30,6 +66,13 @@ TEST_CASE("basics", "[static_vector]") {
 
     CHECK(*v.begin() == 42);
     CHECK(*std::next(v.begin(), 1) == 3);
+}
+
+TEST_CASE("pod", "[static_vector]") {
+    std::cout << "Expect: 1 non-trivial destruct and 1 trivial destruct" << "\n";
+    static_vector<int, 1> v1;
+    static_vector<std::string, 1> v2;
+    CHECK(true);
 }
 
 // inlined_vector<int, -1, false> gNegativeSizedVectorWillStaticAssert;
