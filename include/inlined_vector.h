@@ -20,9 +20,9 @@
 
 namespace bsp {
 namespace detail {
-	template< bool B, class T = void > using enable_if_t = typename std::enable_if<B,T>::type;
+	template<class T, int Capacity> class static_vector {
+		static_assert(Capacity > 0, "Capacity is <= 0!");
 
-	template<class T, std::size_t Capacity> class static_vector_base {
 	public:
 		using value_type = T;
 		using iterator = value_type*;
@@ -32,13 +32,53 @@ namespace detail {
 		using size_type = std::size_t;
 
 	public:
-		static_vector_base() = default;
+		static_vector() = default;
 
-		~static_vector_base(){
+		static_vector(size_type count, const T& value = T()){
+			size_ = count;
+			for(size_type i = 0; i < size_; ++i) {
+				new (data_+i) T(value);
+			}
+		}
+
+		static_vector(const static_vector& other){
+			size_ = other.size_;
+			for(size_type i = 0; i < size_; ++i) {
+				new (data_+i) T(other[i]);
+			}
+		}
+
+		static_vector(static_vector&& other){
+			size_ = other.size_;
+			for(size_type i = 0; i < size_; ++i) {
+				new (data_+i) T(std::move(other[i]));
+			}
+		}
+
+		static_vector& operator=(const static_vector& other){
+			destroy_all();
+			size_ = other.size_;
+			for(size_type i = 0; i < size_; ++i) {
+				new (data_+i) T(other[i]);
+			}
+			return *this;
+		}
+
+		static_vector& operator=(static_vector&& other){
+			destroy_all();
+			size_ = other.size_;
+			for(size_type i = 0; i < size_; ++i) {
+				new (data_+i) T(std::move(other[i]));
+			}
+			return *this;
+		}
+
+		~static_vector(){
 			destroy_all();
 		}
 
 		inline size_type size() const { return size_; }
+
 		constexpr static inline size_type max_size() { return Capacity; }
 
 		template <class U>
@@ -84,11 +124,20 @@ namespace detail {
 			destroy_all();
 		}
 
+		void fill_n(size_type count, const T& value) {
+			destroy_all();
+			if( count > max_size() ) throw std::bad_alloc{};
+			for(size_type i = 0; i < count; ++i) {
+				new (data_+i) T(value);
+			}
+			size_ = count;
+		}
+
 	protected:
 		using raw_type = typename std::aligned_storage<sizeof(T), alignof(T)>::type;
 		
 		raw_type data_[Capacity];
-		size_type size_ = 0; 
+		size_type size_ = 0;
 
 	protected:
 		T* launder(raw_type* rt){
@@ -99,131 +148,15 @@ namespace detail {
 			return reinterpret_cast<const T*>(rt);
 		}
 
-		template <typename U = T>
-		enable_if_t<std::is_trivially_destructible<U>::value> destroy(raw_type* rt){}
-
-		template <typename U = T>
-		enable_if_t<!std::is_trivially_destructible<U>::value> destroy(raw_type* rt){
+		inline void destroy(raw_type* rt){
 			launder(rt)->~T();
 		}
 
-		template <typename U = T>
-		enable_if_t<std::is_trivially_destructible<U>::value> destroy_all(){
-			size_ = 0;
-		}
-
-		template <typename U = T>
-		enable_if_t<!std::is_trivially_destructible<U>::value> destroy_all(){
+		void destroy_all(){
 			for(size_type i = 0; i < size_; ++i) {
 				destroy(data_+i);
 			}
 			size_ = 0;
-		}
-	};
-
-	template<class T, std::size_t Capacity, bool IsTrivialType = std::is_trivial<T>::value> 
-	class static_vector: public static_vector_base<T, Capacity> 
-	// T is a trivial type
-	{		
-	protected:		
-		using base_t = static_vector_base<T, Capacity>; 
-	public:	
-		using base_t::base_t;
-		using typename base_t::size_type;
-		using base_t::size_;
-		using base_t::data_;
-
-		static_vector(size_type count, const T& value = T()){
-			std::fill_n(base_t::begin(), count, value);
-			size_ = count;
-		}
-
-		static_vector(const static_vector& other){
-			std::copy(other.begin(), other.end(), base_t::begin());
-			size_ = other.size_;
-		}
-
-		static_vector(static_vector&& other){
-			std::move(other.begin(), other.end(), base_t::begin());
-			size_ = other.size_;
-		}
-
-		static_vector& operator=(const static_vector& other){
-			std::copy(other.begin(), other.end(), base_t::begin());
-			size_ = other.size_;
-			return *this;
-		}
-
-		static_vector& operator=(static_vector&& other){
-			std::move(other.begin(), other.end(), base_t::begin());
-			std::swap(size_, other.size_);
-			return *this;
-		}
-
-		void fill_n(size_type count, const T& value) {
-			if (count >= base_t::max_size()) throw std::bad_alloc{};
-			std::fill_n(base_t::begin(), count, value);			
-			size_ = count;
-		}
-	};
-
-	template<class T, std::size_t Capacity> class static_vector<T, Capacity, false>: public static_vector_base<T, Capacity> 
-	// T is a non-trivial type
-	{
-	protected:
-		using base_t = static_vector_base<T, Capacity>; 
-	public:	
-		using base_t::base_t;
-		using typename base_t::size_type;
-		using base_t::size_;
-		using base_t::data_;
-
-		static_vector(size_type count, const T& value = T()){
-			size_ = count;
-			for(size_type i = 0; i < size_; ++i) {
-				new (data_+i) T(value);
-			}
-		}
-
-		static_vector(const static_vector& st){
-			size_ = st.size_;
-			for(size_type i = 0; i < size_; ++i) {
-				new (data_+i) T(st[i]);
-			}
-		}
-
-		static_vector(static_vector&& st){
-			size_ = st.size_;
-			for(size_type i = 0; i < size_; ++i) {
-				new (data_+i) T(std::move(st[i]));
-			}
-		}
-
-		static_vector& operator=(const static_vector& other){
-			base_t::destroy_all();
-			size_ = other.size_;
-			for(size_type i = 0; i < size_; ++i) {
-				new (data_+i) T(other[i]);
-			}
-			return *this;
-		}
-
-		static_vector& operator=(static_vector&& other){
-			base_t::destroy_all();
-			size_ = other.size_;
-			for(size_type i = 0; i < size_; ++i) {
-				new (data_+i) T(std::move(other[i]));
-			}
-			return *this;
-		}
-
-		void fill_n(size_type count, const T& value) {
-			base_t::destroy_all();
-			if( count >= base_t::max_size() ) throw std::bad_alloc{};
-			for(size_type i = 0; i < count; ++i) {
-				new (data_+i) T(value);
-			}
-			size_ = count;
 		}
 	};
 
@@ -235,8 +168,10 @@ namespace detail {
 
 // An inlined_vector is a fixed-size array with a vector-like interface
 // that can optionally grow beyond its capacity and become a std::vector.
-template<typename T, std::size_t InitialCapacity, bool CanExpand = false> 
+template<typename T, int Capacity, bool CanExpand = false> 
 class inlined_vector {
+	static_assert(Capacity > 0, "Capacity is <= 0!");
+
 public:
 	using value_type 			 = T;
 	using reference 			 = T&;
@@ -260,12 +195,12 @@ public:
 		}		
 	}
 
-	template<std::size_t InitialCapacity_, bool CanExpand_>
-	inlined_vector(const inlined_vector<T, InitialCapacity_, CanExpand_>& other)
+	template<std::size_t Capacity_, bool CanExpand_>
+	inlined_vector(const inlined_vector<T, Capacity_, CanExpand_>& other)
 		: inlined_vector(other.begin(), other.size()) {}
 
-	template<std::size_t InitialCapacity_, bool CanExpand_>
-	inlined_vector(inlined_vector<T, InitialCapacity_, CanExpand_>&& other)
+	template<std::size_t Capacity_, bool CanExpand_>
+	inlined_vector(inlined_vector<T, Capacity_, CanExpand_>&& other)
 		: inlined_vector(other.begin(), other.size()) {}
 
 	template<class Container>
@@ -273,7 +208,7 @@ public:
 
 	inlined_vector(std::initializer_list<T> els) : inlined_vector(els.begin(), els.size()) {}
 
-	constexpr static inline size_type max_size() { return InitialCapacity; }
+	constexpr static inline size_type max_size() { return Capacity; }
 
 	inline virtual bool can_expand() const { return false; }
 
@@ -290,7 +225,7 @@ public:
 	template <typename U>
 	inline void push_back(U&& value) {
 		if (size_ >= max_size()) {
-			error("inlined_vector::push_back exceeded InitialCapacity");
+			error("inlined_vector::push_back exceeded Capacity");
 		}
 		else {
 			data_internal_.push_back(std::forward<U>(value));
@@ -300,7 +235,7 @@ public:
 
 	template<class... Args> inline void emplace_back(Args&&... args) {
 		if (size_ >= max_size()) {
-			error("inlined_vector::emplace_back exceeded InitialCapacity");
+			error("inlined_vector::emplace_back exceeded Capacity");
 		}
 		else {
 			data_internal_.emplace_back(std::forward<Args>(args)...);
@@ -379,6 +314,7 @@ public:
 
 		if (it == end() || empty()) {
 			error("inlined_vector::erase it == end or container is empty");
+			return end();
 		}
 
 		size_type i = iterator_index(it);
@@ -397,13 +333,13 @@ public:
 		validate_iterator(it);
 
 		if (full()) {
-			error("inlined_vector::insert exceeded InitialCapacity");
+			error("inlined_vector::insert exceeded Capacity");
 			return end();
 		}
 
 		if (it == end()) {
 			push_back(value);
-			return end();
+			return std::prev(end(), 1);
 		}
 		else {
 			// Insert at i and push everything back
@@ -428,7 +364,7 @@ public:
 	}
 
 protected:
-	using array_type = detail::static_vector<T, InitialCapacity>;
+	using array_type = detail::static_vector<T, Capacity>;
 
 	array_type data_internal_;
 	size_type size_ = 0;
@@ -487,14 +423,16 @@ protected:
 #endif
 	}
 
-	template<typename T2, std::size_t N>
+	template<typename T2, int N>
 	friend std::ostream& operator<<(std::ostream& out, const inlined_vector<T2, N, false>& vector);
 };
 
-template<typename T, std::size_t InitialCapacity>
-class inlined_vector<T, InitialCapacity, true> : public inlined_vector<T, InitialCapacity, false> {
+template<typename T, int Capacity>
+class inlined_vector<T, Capacity, true> : public inlined_vector<T, Capacity, false> {
+	static_assert(Capacity > 0, "Capacity is <= 0!");
+
 public:
-	using base_t = inlined_vector<T, InitialCapacity, false>;
+	using base_t = inlined_vector<T, Capacity, false>;
 	using typename base_t::value_type;
 	using typename base_t::reference;
 	using typename base_t::const_reference;
@@ -528,8 +466,8 @@ public:
 		}
 	}
 
-	template<std::size_t InitialCapacity_, bool CanExpand_>
-	inlined_vector(const inlined_vector<T, InitialCapacity_, CanExpand_>& other)
+	template<std::size_t Capacity_, bool CanExpand_>
+	inlined_vector(const inlined_vector<T, Capacity_, CanExpand_>& other)
 		: inlined_vector(other.begin(), other.end(), other.size()) {}
 
 	inlined_vector(inlined_vector&& other)
@@ -696,7 +634,7 @@ protected:
 
 protected:
 	// Helper constructor
-	template<typename Iter> inlined_vector(Iter begin_, Iter end_, std::size_t size) {
+	template<typename Iter> inlined_vector(Iter begin_, Iter end_, size_type size) {
 		size_ = size;
 		if (size_ <= max_size()) {
 			for (auto it = begin_; it != end_; ++it){
@@ -727,11 +665,11 @@ protected:
 		inlined_ = false;
 	}
 
-	template<typename T2, std::size_t N>
+	template<typename T2, int N>
 	friend std::ostream& operator<<(std::ostream& out, const inlined_vector<T2, N, true>& vector);
 };
 
-template<typename T, std::size_t N>
+template<typename T, int N>
 inline std::ostream& operator<<(std::ostream& out, const inlined_vector<T, N, false>& vector) {
 	out << "inlined_vector ";
 	out << "(inlined):  [";
@@ -748,7 +686,7 @@ inline std::ostream& operator<<(std::ostream& out, const inlined_vector<T, N, fa
 	return out;
 }
 
-template<typename T, std::size_t N>
+template<typename T, int N>
 inline std::ostream& operator<<(std::ostream& out, const inlined_vector<T, N, true>& vector) {
 	out << "inlined_vector ";
 	if (vector.inlined_)
