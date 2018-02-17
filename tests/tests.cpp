@@ -470,7 +470,7 @@ TEST_CASE("emplacement", "[inlined_vector]") {
     }
 }
 
-#ifdef INLINED_VECTOR_THROWS
+#ifdef BSP_INLINED_VECTOR_THROWS
 TEST_CASE("exception reporting", "[inlined_vector]"){
     SECTION ("too many elements in std::vector"){
         std::vector<int> v (100, 0);
@@ -499,7 +499,7 @@ TEST_CASE("exception reporting", "[inlined_vector]"){
 }
 #endif
 
-#ifndef INLINED_VECTOR_THROWS
+#ifndef BSP_INLINED_VECTOR_THROWS
 TEST_CASE("ignore extra elements", "[inlined_vector]"){
     SECTION ("too many elements in std::vector"){
         std::vector<int> v (100, 42);

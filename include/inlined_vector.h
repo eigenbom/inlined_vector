@@ -414,11 +414,11 @@ protected:
 	}
 
 	void error(const char* message) const {
-#ifdef INLINED_VECTOR_LOG_ERROR
-		INLINED_VECTOR_LOG_ERROR(message);
+#ifdef BSP_INLINED_VECTOR_LOG_ERROR
+		BSP_INLINED_VECTOR_LOG_ERROR(message);
 #endif
 
-#ifdef INLINED_VECTOR_THROWS
+#ifdef BSP_INLINED_VECTOR_THROWS
 		throw std::runtime_error(message);
 #endif
 	}

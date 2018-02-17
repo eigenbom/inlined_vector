@@ -11,7 +11,7 @@ INC = -I ../include
 TEST?=
 
 tests: tests.cpp Makefile ../include/inlined_vector.h
-	$(CXX) -o ../bin/$@ tests.cpp $(INC) $(CXXFLAGS) $(LLVMLDFLAGS) && \
+	@$(CXX) -o ../bin/$@ tests.cpp $(INC) $(CXXFLAGS) $(LLVMLDFLAGS) && \
 	../bin/tests $(TEST)
 
 tests-asan: tests.cpp Makefile ../include/inlined_vector.h
