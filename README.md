@@ -1,3 +1,7 @@
+# Note
+
+This code has been merged into [utils](https://github.com/eigenbom/utils). Please go there for the latest updates.
+
 # Inlined Vector
 
 A c++11 vector-like data structure that stores elements internally. It can grow beyond its capacity, in which case it becomes a wrapper around std::vector.
